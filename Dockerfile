@@ -1,4 +1,4 @@
-FROM alpine:3.10.3 as base
+FROM alpine:3.12.0 as base
 LABEL maintainer="Denys Zhdanov <denis.zhdanov@gmail.com>"
 
 RUN true \
@@ -20,11 +20,13 @@ RUN true \
       sqlite \
       expect \
       dcron \
-      py-mysqldb \
+      py3-mysqlclient \
       mysql-dev \
       mysql-client \
       postgresql-dev \
       postgresql-client \
+      librdkafka \
+      jansson \
  && rm -rf \
       /etc/nginx/conf.d/default.conf \
  && mkdir -p \
@@ -42,29 +44,32 @@ RUN true \
       pkgconfig \
       py3-cairo \
       py3-pip \
-      py3-pyldap \
-      py3-virtualenv \
-      py-rrd \
-      py-mysqldb \
       openldap-dev \
       python3-dev \
       rrdtool-dev \
       wget \
+      go==1.13.11-r0 \
+      jansson-dev \
+      librdkafka-dev \
+ && pip3 install virtualenv==16.7.10 \
  && virtualenv /opt/graphite \
  && . /opt/graphite/bin/activate \
  && pip3 install \
-      django==1.11.25 \
+      django==2.2.13 \
       django-statsd-mozilla \
       fadvise \
-      gunicorn==19.9.0 \
+      gunicorn==20.0.4 \
+      eventlet>=0.24.1 \
+      gevent>=1.4 \
       msgpack-python \
       redis \
       rrdtool \
       python-ldap \
       mysqlclient \
-      psycopg2
+      psycopg2 \
+      django-cockroachdb==2.2.*
 
-ARG version=1.1.6
+ARG version=1.1.7
 
 # install whisper
 ARG whisper_version=${version}
@@ -92,8 +97,8 @@ RUN . /opt/graphite/bin/activate \
  && pip3 install -r requirements.txt \
  && python3 ./setup.py install
 
-# install statsd (as we have to use this ugly way)
-ARG statsd_version=0.8.5
+# install statsd
+ARG statsd_version=0.8.6
 ARG statsd_repo=https://github.com/statsd/statsd.git
 WORKDIR /opt
 RUN git clone "${statsd_repo}" \
@@ -101,11 +106,34 @@ RUN git clone "${statsd_repo}" \
  && git checkout tags/v"${statsd_version}" \
  && npm install
 
+# build go-carbon w/pickle patch (experimental)
+# https://github.com/lomik/go-carbon/pull/340
+ARG gocarbon_version=0.14.0
+ARG gocarbon_repo=https://github.com/lomik/go-carbon.git
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+RUN git clone "${gocarbon_repo}" /usr/local/src/go-carbon \
+ && cd /usr/local/src/go-carbon \
+ && git checkout tags/v"${gocarbon_version}" \
+ && curl https://patch-diff.githubusercontent.com/raw/lomik/go-carbon/pull/340.patch | git apply \
+ && make \
+ && chmod +x go-carbon && mkdir -p /opt/graphite/bin/ \
+ && cp -fv go-carbon /opt/graphite/bin/go-carbon
+
+# install brubeck (experimental)
+ARG brubeck_version=7e0fbc33ce44e162470de7778b887a75a5ee70bd
+ARG brubeck_repo=https://github.com/lukepalmer/brubeck.git
+ENV BRUBECK_NO_HTTP=1
+RUN git clone "${brubeck_repo}" /usr/local/src/brubeck \
+ && cd /usr/local/src/brubeck && git checkout "${brubeck_version}" \
+ && ./script/bootstrap \
+ && chmod +x brubeck && mkdir -p /opt/graphite/bin/ \
+ && cp -fv brubeck /opt/graphite/bin/brubeck
+
 COPY conf/opt/graphite/conf/                             /opt/defaultconf/graphite/
 COPY conf/opt/graphite/webapp/graphite/local_settings.py /opt/defaultconf/graphite/local_settings.py
 
 # config graphite
-COPY conf/opt/graphite/conf/*.conf /opt/graphite/conf/
+COPY conf/opt/graphite/conf/* /opt/graphite/conf/
 COPY conf/opt/graphite/webapp/graphite/local_settings.py /opt/graphite/webapp/graphite/local_settings.py
 WORKDIR /opt/graphite/webapp
 RUN mkdir -p /var/log/graphite/ \
@@ -121,7 +149,7 @@ ENV STATSD_INTERFACE udp
 
 COPY conf /
 
-# copy /opt from build image
+# copy from build image
 COPY --from=build /opt /opt
 
 # defaults

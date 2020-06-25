@@ -1,3 +1,10 @@
+[![Docker Pulls](https://img.shields.io/docker/pulls/graphiteapp/graphite-statsd.svg?style=flat)](https://hub.docker.com/r/graphiteapp/graphite-statsd/) [![Docker Size](https://img.shields.io/docker/image-size/graphiteapp/graphite-statsd.svg?style=flat&?sort=date)](https://hub.docker.com/r/graphiteapp/graphite-statsd/)
+
+
+This is official Graphite docker image repo.
+
+This repo produces two different repos on Docker Hub - https://hub.docker.com/r/graphiteapp/graphite-statsd (stable repo, with manual releases) and https://hub.docker.com/r/graphiteapp/docker-graphite-statsd (development repo, with automatic builds, unstable, use with caution!)
+
 This repo was based on [@hopsoft's](https://github.com/hopsoft/) [docker-graphite-statsd](https://github.com/hopsoft/docker-graphite-statsd) docker image and was used as base for "official" Graphite docker image with his permission. Also, it contains parts of famous [@obfuscurity's](https://github.com/obfuscurity/) [synthesize](https://github.com/obfuscurity/synthesize) Graphite installer. Thanks a lot, Nathan and Jason!
 
 Any suggestions / patches etc. are welcome!
@@ -111,6 +118,8 @@ Additional environment variables can be set to adjust performance.
 * GRAPHITE_WSGI_REQUEST_TIMEOUT: (65) maximum number of seconds that a request is allowed to run before the daemon process is restarted
 * GRAPHITE_WSGI_MAX_REQUESTS: (1000) limit on the number of requests a daemon process should process before it is shutdown and restarted.
 * GRAPHITE_WSGI_REQUEST_LINE: (0) The maximum size of HTTP request line in bytes.
+* GRAPHITE_WSGI_WORKER_CLASS ("sync"): The type of workers to use. The default class (sync) should handle most “normal” types of workloads. See [gunucorn docs](https://docs.gunicorn.org/en/stable/settings.html#worker-class).
+* GRAPHITE_WSGI_WORKER_CONNECTIONS (1000): The maximum number of simultaneous clients (for Eventlet and Gevent worker types only). See [gunicorn docs](https://docs.gunicorn.org/en/stable/settings.html#worker-connections).
 
 ### Graphite-web
 * GRAPHITE_ALLOWED_HOSTS: (*) In Django 1.5+ set this to the list of hosts your graphite instances is accessible as. See: [https://docs.djangoproject.com/en/dev/ref/settings/#std:setting-ALLOWED_HOSTS](https://docs.djangoproject.com/en/dev/ref/settings/#std:setting-ALLOWED_HOSTS)
@@ -146,8 +155,9 @@ Additional environment variables can be set to adjust performance.
 ## TagDB
 Graphite stores tag information in a separate tag database (TagDB). Please check [tags documentation](https://graphite.readthedocs.io/en/latest/tags.html) for details.
 
+* CARBON_DISABLE_TAGS: (false) if set to 1 or true will disable TagDB on carbon-cache.
 * GRAPHITE_TAGDB: ('graphite.tags.localdatabase.LocalDatabaseTagDB') TagDB is a pluggable store, by default it uses the local SQLite database.
-* REDIS_TAGDB: (false) if set to true will use local Redis instance to store tags.
+* REDIS_TAGDB: (false) if set to 1 or true will use local Redis instance to store tags.
 * GRAPHITE_TAGDB_CACHE_DURATION: (60) Time to cache seriesByTag results.
 * GRAPHITE_TAGDB_AUTOCOMPLETE_LIMIT: (100) Autocomplete default result limit.
 * GRAPHITE_TAGDB_REDIS_HOST: ('localhost') Redis TagDB host
@@ -178,7 +188,7 @@ By default logs are rotated daily, using built-in `/etc/periodic/daily/logrotate
 
 ## Runit
 Each service started and controlled by runit will be gracefully shutdown when stopping the container : wait up to 7 seconds for the service to become down, then it will be killed. The runit environment variable `$SVWAIT` overrides this default timeout. Additionnally, a global timeout can be also specified with the docker-run option `--stop-timeout`.
-Each service started by default can be disabled by setting an environment variable named as : `$<service name>_DISABLED`. For instance : `CARBON_AGGREGATOR_DISABLED=1`, `STATSD_DISABLED=1`...
+Each service started by default can be disabled by setting an environment variable named as : `$<service name>_DISABLED`. For instance : `CARBON_AGGREGATOR_DISABLED=1`, `STATSD_DISABLED=1`, etc. Please note, that any service in image can be disabled, so, some functionality can be broken in this case.
 
 ## Startup custom scripts
 At startup, entrypoint will run all scripts found in the directory /etc/run_once. It can be mounted with a docker-run option like this : `--mount type=bind,source=/path/to/run_once,destination=/etc/run_once`.
@@ -276,6 +286,19 @@ docker-compose up
 
 ## Running through Kubernetes
 You can use this 3-rd party repo with Graphite Helm chart - https://github.com/kiwigrid/helm-charts/tree/master/charts/graphite
+
+## About `root` process 
+
+This image uses `runit` as init system, to run multiple processes in single container. It's not against Docker guidelines but bit against Docker philosophy. Also, `runit` require root privileges to run, so, it's not possible to stop using root privileges, without completely rewrite this image. This is possible, of course, but it's better to use separate images per component then, and having separate repository for this new project. 
+
+## Experimental Features
+### go-carbon 
+
+Use `GOCARBON=1` environment variable to enable [go-carbon](https://github.com/lomik/go-carbon) instance instead of normal Carbon. Use `GRAPHITE_CLUSTER_SERVERS="127.0.0.1:8000"` if you want also use [carbonserver](https://github.com/grobian/carbonserver) feature.
+
+### brubeck
+
+Use `BRUBECK=1` environment variable to enable [brubeck]() instance of normal Statsd. Please note that brubeck has different config format and not fully compatible with original statsd.
 
 
 ## Additional Reading
