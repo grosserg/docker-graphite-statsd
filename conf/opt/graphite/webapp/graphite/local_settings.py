@@ -32,7 +32,7 @@ DATE_FORMAT = os.environ.get('GRAPHITE_DATE_FORMAT', '%m/%d')
 # Logging
 # These can also be configured using Django's LOGGING:
 # https://docs.djangoproject.com/en/1.11/topics/logging/
-LOG_ROTATION = os.environ.get("GRAPHITE_LOG_ROTATION", "true").lower() in ['1', 'true', 'yes']
+LOG_ROTATION = os.environ.get("GRAPHITE_LOG_ROTATION", "false").lower() in ['1', 'true', 'yes']
 LOG_ROTATION_COUNT = int(os.environ.get('GRAPHITE_LOG_ROTATION_COUNT', '1'))
 LOG_RENDERING_PERFORMANCE = os.environ.get("GRAPHITE_LOG_RENDERING_PERFORMANCE", "true").lower() in ['1', 'true', 'yes']
 LOG_CACHE_PERFORMANCE = os.environ.get("GRAPHITE_LOG_CACHE_PERFORMANCE", "true").lower() in ['1', 'true', 'yes']
@@ -93,6 +93,9 @@ URL_PREFIX = str(os.environ.get('GRAPHITE_URL_ROOT', ''))
 # Timeouts for find and render requests
 #FIND_TIMEOUT = 3.0  # Timeout for metric find requests
 #FETCH_TIMEOUT = 3.0  # Timeout to fetch series data
+
+# Allow UTF-8 metrics' names (can cause performance issues)
+UTF8_METRICS = os.environ.get('GRAPHITE_UTF8_METRICS', 'false').lower() in ['1', 'true', 'yes']
 
 #####################################
 # Filesystem Paths #
